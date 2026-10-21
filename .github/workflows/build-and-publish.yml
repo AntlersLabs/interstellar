@@ -1,0 +1,55 @@
+name: Build & Publish Patched PHP 8.4.27 (CVE-2026-109618 Fix)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve Lowercase GHCR Image Prefix
+        run: |
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_PREFIX=ghcr.io/${OWNER_LC}/php" >> $GITHUB_ENV
+
+      - name: Build and Push Patched Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}:8.4-fpm-alpine
+            ${{ env.IMAGE_PREFIX }}:8.4.27-fpm-alpine
+            ${{ env.IMAGE_PREFIX }}:latest-fpm-alpine
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verification Summary
+        run: |
+          echo "### Image Built & Published Successfully 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "- **Base Version**: PHP 8.4.27 (Alpine 3.24, FPM)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Fixes**: CVE-2026-109618 & CVE-2026-109619" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Tags**:" >> $GITHUB_STEP_SUMMARY
+          echo "  - \`${{ env.IMAGE_PREFIX }}:8.4-fpm-alpine\`" >> $GITHUB_STEP_SUMMARY
+          echo "  - \`${{ env.IMAGE_PREFIX }}:8.4.27-fpm-alpine\`" >> $GITHUB_STEP_SUMMARY
